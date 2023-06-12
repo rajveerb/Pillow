@@ -509,7 +509,7 @@ class Image:
     format_description = None
     _close_exclusive_fp_after_loading = True
 
-    def __init__(self):
+    def __init__(self, logging=False):
         # FIXME: take "new" parameters / other image?
         # FIXME: turn mode and size into delegating properties?
         self.im = None
@@ -521,6 +521,9 @@ class Image:
         self.readonly = 0
         self.pyaccess = None
         self._exif = None
+        self.logging = logging
+        if self.logging:
+            self.log_time = {}
 
     def __getattr__(self, name):
         if name == "category":
@@ -864,6 +867,7 @@ class Image:
                 self.palette.mode = palette_mode
                 self.palette.palette = self.im.getpalette(palette_mode, palette_mode)
 
+        
         if self.im is not None:
             if cffi and USE_CFFI_ACCESS:
                 if self.pyaccess:
@@ -933,7 +937,6 @@ class Image:
         :rtype: :py:class:`~PIL.Image.Image`
         :returns: An :py:class:`~PIL.Image.Image` object.
         """
-
         self.load()
 
         has_transparency = self.info.get("transparency") is not None
@@ -946,6 +949,8 @@ class Image:
             if mode == "RGB" and has_transparency:
                 mode = "RGBA"
         if not mode or (mode == self.mode and not matrix):
+            # below takes time, but the actual copy operation is measured inside the below copy version because the difference is negligible
+            # Note: The actual copy (memcpy) happens inside the _imaging shared library C code.
             return self.copy()
 
         if matrix:
@@ -1203,7 +1208,19 @@ class Image:
         :returns: An :py:class:`~PIL.Image.Image` object.
         """
         self.load()
-        return self._new(self.im.copy())
+
+        if self.logging:
+            import time
+        
+            start = time.time()
+            _copy_im = self.im.copy()
+            end = time.time()
+
+            self.log_time["copy"] = end - start
+
+            return self._new(_copy_im)
+        else:
+            return self._new(self.im.copy())
 
     __copy__ = copy
 

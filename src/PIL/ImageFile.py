@@ -154,6 +154,7 @@ class ImageFile(Image.Image):
 
     def load(self):
         """Load image data based on tile list"""
+        import time
 
         if self.tile is None:
             msg = "cannot load this image"
@@ -213,7 +214,16 @@ class ImageFile(Image.Image):
                 except (AttributeError, OSError, ImportError):
                     self.map = None
 
-        self.load_prepare()
+        if self.logging:
+            start = time.time()
+            # Allocates memory for the new image based on its mode and size
+            self.load_prepare()
+            end = time.time()
+            self.log_time["load_prepare"]  = end - start
+            # print(f"load_prepare: {end - start}")
+        else:
+            self.load_prepare()
+ 
         err_code = -3  # initialize to unknown error
         if not self.map:
             # sort tiles in file order
@@ -243,37 +253,88 @@ class ImageFile(Image.Image):
                         decoder.setfd(self.fp)
                         err_code = decoder.decode(b"")[1]
                     else:
-                        b = prefix
-                        while True:
-                            try:
-                                s = read(self.decodermaxblock)
-                            except (IndexError, struct.error) as e:
-                                # truncated png/gif
-                                if LOAD_TRUNCATED_IMAGES:
-                                    break
-                                else:
-                                    msg = "image file is truncated"
-                                    raise OSError(msg) from e
+                        if self.logging:
+                            b = prefix
+                            read_time = None
+                            decode_time = None
+                            while True:
+                                try:
+                                    start = time.time()
+                                    s = read(self.decodermaxblock)
+                                    end = time.time()
+                                    if(read_time):
+                                        read_time += end - start
+                                    else:
+                                        read_time = end - start
 
-                            if not s:  # truncated jpeg
-                                if LOAD_TRUNCATED_IMAGES:
-                                    break
-                                else:
-                                    msg = (
-                                        "image file is truncated "
-                                        f"({len(b)} bytes not processed)"
-                                    )
-                                    raise OSError(msg)
+                                except (IndexError, struct.error) as e:
+                                    # truncated png/gif
+                                    if LOAD_TRUNCATED_IMAGES:
+                                        break
+                                    else:
+                                        msg = "image file is truncated"
+                                        raise OSError(msg) from e
 
-                            b = b + s
-                            n, err_code = decoder.decode(b)
-                            if n < 0:
-                                break
-                            b = b[n:]
+                                if not s:  # truncated jpeg
+                                    if LOAD_TRUNCATED_IMAGES:
+                                        break
+                                    else:
+                                        msg = (
+                                            "image file is truncated "
+                                            f"({len(b)} bytes not processed)"
+                                        )
+                                        raise OSError(msg)
+
+                                b = b + s
+
+                                start = time.time()
+                                n, err_code = decoder.decode(b)
+                                end = time.time()
+
+                                if(decode_time):
+                                    decode_time += end - start
+                                else:
+                                    decode_time = end - start
+
+                                if n < 0:
+                                    break
+                                b = b[n:]
+                        else:
+                            b = prefix
+                            while True:
+                                try:
+                                    s = read(self.decodermaxblock)
+                                except (IndexError, struct.error) as e:
+                                    # truncated png/gif
+                                    if LOAD_TRUNCATED_IMAGES:
+                                        break
+                                    else:
+                                        msg = "image file is truncated"
+                                        raise OSError(msg) from e
+
+                                if not s:  # truncated jpeg
+                                    if LOAD_TRUNCATED_IMAGES:
+                                        break
+                                    else:
+                                        msg = (
+                                            "image file is truncated "
+                                            f"({len(b)} bytes not processed)"
+                                        )
+                                        raise OSError(msg)
+
+                                b = b + s
+                                n, err_code = decoder.decode(b)
+                                if n < 0:
+                                    break
+                                b = b[n:]
                 finally:
                     # Need to cleanup here to prevent leaks
                     decoder.cleanup()
-
+                    if self.logging:
+                        self.log_time["read"]= read_time
+                        self.log_time["decode"]= decode_time
+                        # print("read:", read_time)
+                        # print("decode:", decode_time)
         self.tile = []
         self.readonly = readonly
 
