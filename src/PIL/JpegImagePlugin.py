@@ -818,8 +818,8 @@ def _save_cjpeg(im, fp, filename):
 
 ##
 # Factory for making JPEG and MPO instances
-def jpeg_factory(fp=None, filename=None):
-    im = JpegImageFile(fp, filename)
+def jpeg_factory(fp=None, filename=None, logging=False):
+    im = JpegImageFile(fp, filename, logging=logging)
     try:
         mpheader = im._getmp()
         if mpheader[45057] > 1:

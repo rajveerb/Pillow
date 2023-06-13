@@ -85,8 +85,8 @@ def _tilesort(t):
 class ImageFile(Image.Image):
     """Base class for image file format handlers."""
 
-    def __init__(self, fp=None, filename=None):
-        super().__init__()
+    def __init__(self, fp=None, filename=None, logging=False):
+        super().__init__(logging=logging)
 
         self._min_frame = 0
 

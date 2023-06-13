@@ -3188,7 +3188,7 @@ def _decompression_bomb_check(size):
         )
 
 
-def open(fp, mode="r", formats=None):
+def open(fp, mode="r", formats=None, logging=False):
     """
     Opens and identifies the given image file.
 
@@ -3268,7 +3268,7 @@ def open(fp, mode="r", formats=None):
                     accept_warnings.append(result)
                 elif result:
                     fp.seek(0)
-                    im = factory(fp, filename)
+                    im = factory(fp, filename, logging=logging)
                     _decompression_bomb_check(im.size)
                     return im
             except (SyntaxError, IndexError, TypeError, struct.error):
